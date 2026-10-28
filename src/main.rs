@@ -2,10 +2,18 @@ use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 
-fn leerArchivo(peticion: Vec<&str>) -> Option<String> {
-    match fs::read_to_string(&peticion[1][1..]) {
+fn leer_archivo(peticion: &str) -> Option<String> {
+    let ruta: &str = if peticion == "/" {
+        "index.html"
+    } else if peticion.starts_with('/') {
+        &peticion[1..]
+    } else {
+        peticion
+    };
+
+    match fs::read_to_string(ruta) {
         Ok(contenido) => {
-            println!("¡Archivo {} leído con éxito!", peticion[1]);
+            println!("¡Archivo {} leído con éxito!", ruta);
             Some(contenido)
         }
         Err(e) => {
@@ -16,7 +24,7 @@ fn leerArchivo(peticion: Vec<&str>) -> Option<String> {
 }
 
 fn main() {
-    println!("Hello, world!");
+    println!("Programa en ejecucion!!");
 
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap(); // Abre el puerto en nuesto ordenador
 
@@ -33,7 +41,7 @@ fn main() {
                     Err(e) => println!("No se pudo obtener la IP: {e}"),
                 }
 
-                let mut buf_reader = BufReader::new(&mut conexion);
+                let buf_reader = BufReader::new(&mut conexion);
 
                 if let Some(resultado_linea) = buf_reader.lines().next() {
                     match resultado_linea {
@@ -41,7 +49,7 @@ fn main() {
                             let archivo = primera_linea.split_whitespace().collect::<Vec<&str>>();
                             println!("Petición recibida: {}", archivo[1]);
 
-                            if let Some(contenido) = leerArchivo(archivo) {
+                            if let Some(contenido) = leer_archivo(archivo[1]) {
                                 let respuesta = format!(
                                     "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n{}",
                                     contenido
@@ -49,7 +57,14 @@ fn main() {
                                 conexion.write_all(respuesta.as_bytes()).unwrap();
                             } else {
                                 println!("No se pudo enviar el archivo porque no existe.");
+                                let error_cont: String  = leer_archivo("error404.html").unwrap();
+                                let respuesta = format!(
+                                    "HTTP/1.1 404 NOT FOUND\r\nContent-Type: text/html\r\n\r\n{}",
+                                    error_cont
+                                );
+                                conexion.write_all(respuesta.as_bytes()).unwrap();
                             }
+                            
                         }
                         Err(e) => {
                             println!("Error al leer la línea: {}", e);

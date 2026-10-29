@@ -1,27 +1,7 @@
-use std::fs;
-use std::io::{BufRead, BufReader, Write};
-use std::net::TcpListener;
+mod servidor;
 
-fn leer_archivo(peticion: &str) -> Option<String> {
-    let ruta: &str = if peticion == "/" {
-        "index.html"
-    } else if peticion.starts_with('/') {
-        &peticion[1..]
-    } else {
-        peticion
-    };
-
-    match fs::read_to_string(ruta) {
-        Ok(contenido) => {
-            println!("¡Archivo {} leído con éxito!", ruta);
-            Some(contenido)
-        }
-        Err(e) => {
-            println!("Error: No se pudo encontrar o leer el archivo ({e})");
-            None
-        }
-    }
-}
+use std::net::{TcpListener};
+use std::thread;
 
 fn main() {
     println!("Programa en ejecucion!!");
@@ -33,45 +13,12 @@ fn main() {
 
         match stream {
             // Nos da un mensaje depende si se a establecido o no la conexion con el user
-            Ok(mut conexion) => {
-                // 1. Capturamos el TcpStream en la variable 'conexion'
-                // 2. Le preguntamos su dirección IP usando el método .peer_addr()
-                match conexion.peer_addr() {
-                    Ok(addr) => println!("Nuevo cliente conectado desde la IP: {addr}"),
-                    Err(e) => println!("No se pudo obtener la IP: {e}"),
-                }
-
-                let buf_reader = BufReader::new(&mut conexion);
-
-                if let Some(resultado_linea) = buf_reader.lines().next() {
-                    match resultado_linea {
-                        Ok(primera_linea) => {
-                            let archivo = primera_linea.split_whitespace().collect::<Vec<&str>>();
-                            println!("Petición recibida: {}", archivo[1]);
-
-                            if let Some(contenido) = leer_archivo(archivo[1]) {
-                                let respuesta = format!(
-                                    "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n{}",
-                                    contenido
-                                );
-                                conexion.write_all(respuesta.as_bytes()).unwrap();
-                            } else {
-                                println!("No se pudo enviar el archivo porque no existe.");
-                                let error_cont: String  = leer_archivo("error404.html").unwrap();
-                                let respuesta = format!(
-                                    "HTTP/1.1 404 NOT FOUND\r\nContent-Type: text/html\r\n\r\n{}",
-                                    error_cont
-                                );
-                                conexion.write_all(respuesta.as_bytes()).unwrap();
-                            }
-                            
-                        }
-                        Err(e) => {
-                            println!("Error al leer la línea: {}", e);
-                        }
-                    }
-                }
+            Ok(conexion) => {
+                thread::spawn(move || {
+                    servidor::manejar_conexion(conexion);
+                });
             }
+
             Err(e) => {
                 println!("Fallo en la conexión: {e}");
             }
